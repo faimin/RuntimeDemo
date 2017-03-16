@@ -8,6 +8,7 @@
 
 #import "ViewController.h"
 #import <objc/runtime.h>
+#import <objc/message.h>
 
 @interface ZDObjc : NSObject
 
@@ -28,6 +29,7 @@ static const void *key = &key;
 @interface ViewController ()
 
 @property (weak, nonatomic) IBOutlet UITableView *tableView;
+@property (nonatomic, assign) NSInteger tempCount;
 
 @end
 
@@ -38,6 +40,8 @@ static const void *key = &key;
     // Do any additional setup after loading the view, typically from a nib.
     
     [self copyWeakProperty];
+    
+    [self testSet];
 }
 
 //模仿weak属性的实现
@@ -58,6 +62,26 @@ static const void *key = &key;
         NSString *description = [result description];
         NSLog(@"%@", description);
     }
+}
+
+#pragma mark - KVC 
+
+- (void)testSet {
+    NSInteger i = self.tempCount;
+    
+    [self setValue:@(100) forKey:@"tempCount"];
+    NSInteger ii = self.tempCount;
+    
+    SEL selector = sel_registerName("setTempCount:");
+    __unused const char *selName = sel_getName(selector); //"setTempCount:"
+    Method method = class_getInstanceMethod([self class], selector);
+    __unused const char *encode = method_getTypeEncoding(method);//"v24@0:8q16"
+    __unused SEL sel = method_getName(method);
+    
+    ((void (*) (id, SEL, NSInteger)) (void*) objc_msgSend) (self, selector, 200);
+    NSInteger iii = self.tempCount;
+    
+    NSLog(@"%zd, %zd, %zd", i, ii, iii);
 }
 
 - (void)didReceiveMemoryWarning {
