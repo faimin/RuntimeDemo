@@ -101,6 +101,38 @@ static const void *key = &key;
     NSLog(@"");
 }
 
+// https://github.com/ming1016/study/wiki/CFRunLoop
+- (void)test {
+    // 接到程序崩溃时的信号进行自主处理例如弹出提示等
+    CFRunLoopRef runLoop = CFRunLoopGetCurrent();
+    NSArray *allModes = CFBridgingRelease(CFRunLoopCopyAllModes(runLoop));
+    while (1) {
+        for (NSString *mode in allModes) {
+            CFRunLoopRunInMode((CFStringRef)mode, 0.001, false);
+        }
+    }
+}
+
+- (BOOL)runUntilBlock:(BOOL(^)())block timeout:(NSTimeInterval)timeout {
+    __block Boolean fulfilled = NO;
+    void (^beforeWaiting) (CFRunLoopObserverRef observer, CFRunLoopActivity activity) = ^(CFRunLoopObserverRef observer, CFRunLoopActivity activity) {
+        fulfilled = block();
+        if (fulfilled) {
+            CFRunLoopStop(CFRunLoopGetCurrent());
+        }
+    };
+    
+    CFRunLoopObserverRef observer = CFRunLoopObserverCreateWithHandler(NULL, kCFRunLoopBeforeWaiting, true, 0, beforeWaiting);
+    CFRunLoopAddObserver(CFRunLoopGetCurrent(), observer, kCFRunLoopDefaultMode);
+    
+    // Run!
+    CFRunLoopRunInMode(kCFRunLoopDefaultMode, timeout, false);
+    
+    CFRunLoopRemoveObserver(CFRunLoopGetCurrent(), observer, kCFRunLoopDefaultMode);
+    CFRelease(observer);
+    
+    return fulfilled;
+}
 
 @end
 
