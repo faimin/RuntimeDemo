@@ -41,7 +41,14 @@ static const void *key = &key;
     
     [self copyWeakProperty];
     
-    [self testSet];
+    [self testMsg];
+    
+    [self testIMP];
+}
+
+- (void)didReceiveMemoryWarning {
+    [super didReceiveMemoryWarning];
+    // Dispose of any resources that can be recreated.
 }
 
 //模仿weak属性的实现
@@ -64,15 +71,15 @@ static const void *key = &key;
     }
 }
 
-#pragma mark - KVC 
+#pragma mark -
 
-- (void)testSet {
+- (void)testMsg {
     NSInteger i = self.tempCount;
     
     [self setValue:@(100) forKey:@"tempCount"];
     NSInteger ii = self.tempCount;
     
-    SEL selector = sel_registerName("setTempCount:");
+    SEL selector = sel_registerName("setTempCount:");//sel_getUid("setTempCount:")
     __unused const char *selName = sel_getName(selector); //"setTempCount:"
     Method method = class_getInstanceMethod([self class], selector);
     __unused const char *encode = method_getTypeEncoding(method);//"v24@0:8q16"
@@ -84,10 +91,19 @@ static const void *key = &key;
     NSLog(@"%zd, %zd, %zd", i, ii, iii);
 }
 
-- (void)didReceiveMemoryWarning {
-    [super didReceiveMemoryWarning];
-    // Dispose of any resources that can be recreated.
+// http://stackoverflow.com/questions/7017281/performselector-may-cause-a-leak-because-its-selector-is-unknown
+- (void)testIMP {
+    SEL selector = sel_getUid("setTempCount:");
+    IMP imp = class_getMethodImplementation([self class], selector); //[self methodForSelector:selector];
+    void (*zdFunc)(id, SEL, NSInteger) = (void *)imp;//(void (*)(id, SEL, NSInteger))imp;
+    zdFunc(self, selector, 7);
+    NSLog(@"%zd", self.tempCount);
+    NSLog(@"");
 }
 
 
 @end
+
+
+
+
