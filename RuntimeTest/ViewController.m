@@ -44,6 +44,8 @@ static const void *key = &key;
     [self testMsg];
     
     [self testIMP];
+    
+    [self hookBlock];
 }
 
 - (void)didReceiveMemoryWarning {
@@ -85,10 +87,10 @@ static const void *key = &key;
     __unused const char *encode = method_getTypeEncoding(method);//"v24@0:8q16"
     __unused SEL sel = method_getName(method);
     
-    ((void (*) (id, SEL, NSInteger)) (void*) objc_msgSend) (self, selector, 200);
+    ( (void (*) (id, SEL, NSInteger)) (void*) objc_msgSend) (self, selector, 200);
     NSInteger iii = self.tempCount;
     
-    NSLog(@"%zd, %zd, %zd", i, ii, iii);
+    NSLog(@"%ld, %ld, %ld", (long)i, (long)ii, (long)iii);
 }
 
 // http://stackoverflow.com/questions/7017281/performselector-may-cause-a-leak-because-its-selector-is-unknown
@@ -97,7 +99,7 @@ static const void *key = &key;
     IMP imp = class_getMethodImplementation([self class], selector); //[self methodForSelector:selector];
     void (*zdFunc)(id, SEL, NSInteger) = (void *)imp;//(void (*)(id, SEL, NSInteger))imp;
     zdFunc(self, selector, 7);
-    NSLog(@"%zd", self.tempCount);
+    NSLog(@"%ld", (long)self.tempCount);
     NSLog(@"");
 }
 
@@ -132,6 +134,57 @@ static const void *key = &key;
     CFRelease(observer);
     
     return fulfilled;
+}
+
+//----------------------------------------------------
+enum {
+    BLOCK_DEALLOCATING =      (0x0001),  // runtime
+    BLOCK_REFCOUNT_MASK =     (0xfffe),  // runtime
+    BLOCK_NEEDS_FREE =        (1 << 24), // runtime
+    BLOCK_HAS_COPY_DISPOSE =  (1 << 25), // compiler
+    BLOCK_HAS_CTOR =          (1 << 26), // compiler: helpers have C++ code
+    BLOCK_IS_GC =             (1 << 27), // runtime
+    BLOCK_IS_GLOBAL =         (1 << 28), // compiler
+    BLOCK_USE_STRET =         (1 << 29), // compiler: undefined if !BLOCK_HAS_SIGNATURE
+    BLOCK_HAS_SIGNATURE  =    (1 << 30)  // compiler
+};
+
+
+struct Block_layout {
+    void *isa; // initialized to &_NSConcreteStackBlock or &_NSConcreteGlobalBlock
+    int flags;
+    int reserved;
+    void (*invoke)(void *, ...);
+    struct Block_descriptor_1 {
+        unsigned long int reserved;         // NULL
+        unsigned long int size;             // sizeof(struct Block_literal_1)
+        // optional helper functions
+        void (*copy_helper)(void *dst, const void *src);     // IFF (1<<25)
+        void (*dispose_helper)(const void *src);             // IFF (1<<25)
+        // required ABI.2010.3.16
+        const char *signature;                         // IFF (1<<30)
+        const char *layout;
+    } *descriptor;
+    // imported variables
+};
+
+void printHookMsg(self, _cmd) {
+    NSLog(@"hookBlock");
+}
+
+- (void)hookBlock {
+    __auto_type block = ^() {
+        NSLog(@"block");
+    };
+    
+    //IMP imp = imp_implementationWithBlock(block);
+    
+    struct Block_layout *layout = (__bridge void *)block;
+    if (!(layout->flags & BLOCK_HAS_SIGNATURE)) return;
+    
+    layout->invoke = (void *)printHookMsg;
+    
+    block();
 }
 
 @end
